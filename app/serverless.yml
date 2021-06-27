@@ -1,0 +1,114 @@
+service: ${self:custom.profile}-app
+
+custom:
+  profile: gaqqie-sky
+  defaultStage: dev
+  #environment:
+  #  dev: ${file(../conf/dev.yml)}
+  #  prd: ${file(../conf/prd.yml)}
+  #webSiteName: ${self:custom.environment.${self:provider.stage}.webSiteName}
+  #s3Sync:
+  #  - bucketName: ${self:custom.webSiteName}
+  #    localDir: ../static
+  lambdaRetry:
+    - ErrorEquals:
+        - Lambda.ServiceException
+        - Lambda.AWSLambdaException
+        - Lambda.SdkClientException
+      IntervalSeconds: 1
+      MaxAttempts: 3
+      BackoffRate: 2
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: ${opt:stage, self:custom.defaultStage}
+  profile: ${self:custom.profile}-${self:provider.stage}
+  region: ap-northeast-1
+  #region: ${self:custom.environment.${self:provider.stage}.region}
+  memorySize: 512
+  timeout: 60
+  logRetentionInDays: 7
+  #tracing: true
+  environment:
+    #DYNAMODB_TABLE: horoscope-${self:provider.stage}
+    #IBMQ_TOKEN: ${ssm:/${self:custom.profile}/${self:provider.stage}/IBMQ_TOKEN}
+    #S3_BUCKET_NAME: ${self:custom.webSiteName}
+    #S3_TEMPLATE_KEY: "horoscope_template.html"
+    #S3_OUTPUT_KEY: "horoscope.html"
+    #SLACK_WEBHOOK_URL: ${ssm:/${self:custom.profile}/${self:provider.stage}/SLACK_WEBHOOK_URL}
+    STAGE: ${self:provider.stage}
+  iamRoleStatements:
+    #- Effect: Allow
+    #  Action:
+    #    - dynamodb:Query
+    #    - dynamodb:Scan
+    #    - dynamodb:GetItem
+    #    - dynamodb:PutItem
+    #    - dynamodb:UpdateItem
+    #    - dynamodb:DeleteItem
+    #  Resource:
+    #    - "Fn::GetAtt": [DynamoDbTable, Arn]
+    #- Effect: Allow
+    #  Action:
+    #    - s3:GetObject
+    #    - s3:PutObject
+    #  Resource:
+    #    - "Fn::GetAtt": [WebSiteS3Bucket, Arn]
+    #- Effect: Allow
+    #  Action:
+    #    - states:ListStateMachines
+    #    - states:StartExecution
+    #  Resource:
+    #    - arn:aws:states:${self:provider.region}:${ssm:/account}:stateMachine:*
+    - Effect: Allow
+      Action:
+        - xray:PutTraceSegments
+        - xray:PutTelemetryRecords
+      Resource: "*"
+  #layers:
+  #  - arn:aws:lambda:${self:provider.region}:420165488524:layer:AWSLambda-Python37-SciPy1x:2
+  #  - ${cf:${self:custom.profile}-common-${self:provider.stage}.QiskitLambdaLayerQualifiedArn}
+
+package:
+  exclude:
+    - node_modules/**
+    - tests/**
+    - __pycache__/**
+    # json,yaml
+
+functions:
+  echo:
+    handler: echo.echo
+    events:
+      - http:
+          path: /pet
+          method: POST
+
+resources:
+  Resources:
+    ApiGatewayRestApiUser:
+      Type: "AWS::ApiGateway::RestApi"
+      Properties:
+        Body: ${file(./gaqqie-user-api.yaml)}
+    GetPersonApiPermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        #FunctionName: "gaqqie-sky-app-dev-echo"
+        FunctionName:
+          Fn::GetAtt:
+            - EchoLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
+    ApiGatewayDeployment:
+      Type: AWS::ApiGateway::Deployment
+      Properties:
+        RestApiId:
+          Ref: ApiGatewayRestApiUser
+        StageName: ${self:provider.stage}
+
+plugins:
+  - serverless-s3-sync
+  - serverless-step-functions
+  - serverless-plugin-tracing
