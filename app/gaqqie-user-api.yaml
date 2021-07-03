@@ -1,0 +1,151 @@
+openapi: 3.0.1
+info:
+  title: gaqqie user API
+  contact:
+    email: tknsryk@gmail.com
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  version: 0.0.1
+externalDocs:
+  description: TODO
+  url: http://swagger.io
+paths:
+  /v1/jobs:
+    post:
+      tags:
+      - job
+      operationId: submit_job
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/job'
+        required: true
+      responses:
+        200:
+          description: successful queued
+        405:
+          description: Invalid input
+          content: {}
+      x-codegen-request-body-name: body
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiSubmitJobLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+  /v1/jobs/{id}:
+    get:
+      tags:
+      - job
+      operationId: get_job_by_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/job'
+        404:
+          description: job not found
+          content: {}
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetJobByIdLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+  /v1/devices/{name}:
+    get:
+      tags:
+      - device
+      operationId: get_device_by_name
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/device'
+        404:
+          description: name not found
+          content: {}
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetDeviceByNameLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+components:
+  schemas:
+    job:
+      required:
+      - id
+      type: object
+      properties:
+        id:
+          type: string
+          description: a unique id of job
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - QUEUED
+          - RUNNING
+          - SUCCEEDED
+          - CANCELLED
+          - FAILED
+        provider_name:
+          type: string
+        device_name:
+          type: string
+        create_time:
+          type: string
+        end_time:
+          type: string
+        instructions:
+          type: string
+        results:
+          type: string
+    device:
+      required:
+      - name
+      type: object
+      properties:
+        name:
+          type: string
+          description: a unique name of device
+        provider_name:
+          type: string
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - SUBMITTABLE
+          - UNSUBMITTABLE
+        num_qubits:
+          type: integer
+          format: int32
+          minimum: 1
+        max_shots:
+          type: integer
+          format: int32
+          minimum: 1
+        queued_jobs:
+          type: integer
+          format: int32
+          minimum: 1

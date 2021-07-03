@@ -27,7 +27,7 @@ provider:
   region: ap-northeast-1
   #region: ${self:custom.environment.${self:provider.stage}.region}
   memorySize: 512
-  timeout: 60
+  timeout: 30
   logRetentionInDays: 7
   #tracing: true
   environment:
@@ -78,12 +78,12 @@ package:
     # json,yaml
 
 functions:
-  echo:
-    handler: echo.echo
-    events:
-      - http:
-          path: /pet
-          method: POST
+  UserApiSubmitJob:
+    handler: user_api_jobs.submit_job
+  UserApiGetJobById:
+    handler: user_api_jobs.get_job_by_id
+  UserApiGetDeviceByName:
+    handler: user_api_devices.get_device_by_name
 
 resources:
   Resources:
@@ -91,24 +91,41 @@ resources:
       Type: "AWS::ApiGateway::RestApi"
       Properties:
         Body: ${file(./gaqqie-user-api.yaml)}
-    GetPersonApiPermission:
-      Type: "AWS::Lambda::Permission"
-      Properties:
-        #FunctionName: "gaqqie-sky-app-dev-echo"
-        FunctionName:
-          Fn::GetAtt:
-            - EchoLambdaFunction
-            - Arn
-        Action: "lambda:InvokeFunction"
-        Principal: "apigateway.amazonaws.com"
     ApiGatewayDeployment:
       Type: AWS::ApiGateway::Deployment
       Properties:
         RestApiId:
           Ref: ApiGatewayRestApiUser
         StageName: ${self:provider.stage}
+    UserApiSubmitJobPermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - UserApiSubmitJobLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
+    UserApiGetJobByIdPermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - UserApiGetJobByIdLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
+    UserApiGetDeviceByNamePermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - UserApiGetDeviceByNameLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
 
-plugins:
-  - serverless-s3-sync
-  - serverless-step-functions
-  - serverless-plugin-tracing
+#plugins:
+#  - serverless-s3-sync
+#  - serverless-step-functions
+#  - serverless-plugin-tracing
