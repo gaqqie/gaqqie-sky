@@ -29,6 +29,7 @@ provider:
   memorySize: 512
   timeout: 30
   logRetentionInDays: 7
+  lambdaHashingVersion: 20201221
   #tracing: true
   environment:
     #DYNAMODB_TABLE: horoscope-${self:provider.stage}
@@ -38,50 +39,54 @@ provider:
     #S3_OUTPUT_KEY: "horoscope.html"
     #SLACK_WEBHOOK_URL: ${ssm:/${self:custom.profile}/${self:provider.stage}/SLACK_WEBHOOK_URL}
     STAGE: ${self:provider.stage}
-  iamRoleStatements:
-    #- Effect: Allow
-    #  Action:
-    #    - dynamodb:Query
-    #    - dynamodb:Scan
-    #    - dynamodb:GetItem
-    #    - dynamodb:PutItem
-    #    - dynamodb:UpdateItem
-    #    - dynamodb:DeleteItem
-    #  Resource:
-    #    - "Fn::GetAtt": [DynamoDbTable, Arn]
-    #- Effect: Allow
-    #  Action:
-    #    - s3:GetObject
-    #    - s3:PutObject
-    #  Resource:
-    #    - "Fn::GetAtt": [WebSiteS3Bucket, Arn]
-    #- Effect: Allow
-    #  Action:
-    #    - states:ListStateMachines
-    #    - states:StartExecution
-    #  Resource:
-    #    - arn:aws:states:${self:provider.region}:${ssm:/account}:stateMachine:*
-    - Effect: Allow
-      Action:
-        - xray:PutTraceSegments
-        - xray:PutTelemetryRecords
-      Resource: "*"
+  iam:
+    role:
+      statements:
+        #- Effect: Allow
+        #  Action:
+        #    - dynamodb:Query
+        #    - dynamodb:Scan
+        #    - dynamodb:GetItem
+        #    - dynamodb:PutItem
+        #    - dynamodb:UpdateItem
+        #    - dynamodb:DeleteItem
+        #  Resource:
+        #    - "Fn::GetAtt": [DynamoDbTable, Arn]
+        #- Effect: Allow
+        #  Action:
+        #    - s3:GetObject
+        #    - s3:PutObject
+        #  Resource:
+        #    - "Fn::GetAtt": [WebSiteS3Bucket, Arn]
+        #- Effect: Allow
+        #  Action:
+        #    - states:ListStateMachines
+        #    - states:StartExecution
+        #  Resource:
+        #    - arn:aws:states:${self:provider.region}:${ssm:/account}:stateMachine:*
+        - Effect: Allow
+          Action:
+            - xray:PutTraceSegments
+            - xray:PutTelemetryRecords
+          Resource: "*"
   #layers:
   #  - arn:aws:lambda:${self:provider.region}:420165488524:layer:AWSLambda-Python37-SciPy1x:2
   #  - ${cf:${self:custom.profile}-common-${self:provider.stage}.QiskitLambdaLayerQualifiedArn}
 
 package:
-  exclude:
-    - node_modules/**
-    - tests/**
-    - __pycache__/**
-    # json,yaml
+  patterns:
+    - "!node_modules/**"
+    - "!tests/**"
+    - "!__pycache__/**"
+    # "!json,yaml"
 
 functions:
   UserApiSubmitJob:
     handler: user_api_jobs.submit_job
   UserApiGetJobById:
     handler: user_api_jobs.get_job_by_id
+  UserApiGetResultByJobId:
+    handler: user_api_jobs.get_result_by_job_id
   UserApiGetDeviceByName:
     handler: user_api_devices.get_device_by_name
 
@@ -112,6 +117,15 @@ resources:
         FunctionName:
           Fn::GetAtt:
             - UserApiGetJobByIdLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
+    UserApiGetResultByJobIdPermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - UserApiGetResultByJobIdLambdaFunction
             - Arn
         Action: "lambda:InvokeFunction"
         Principal: "apigateway.amazonaws.com"

@@ -29,3 +29,17 @@ def get_job_by_id(event, context):
     }
     print(f"response={response}")
     return response
+
+def get_result_by_job_id(event, context):
+    print(f"event={event}")
+    job_id = event["pathParameters"]["job_id"]
+    responce_data = {
+      "job_id": job_id,
+      "result": {"00": 498, "11": 502},
+    }
+    response = {
+        "statusCode": 200,
+        "body": json.dumps(responce_data),
+    }
+    print(f"response={response}")
+    return response

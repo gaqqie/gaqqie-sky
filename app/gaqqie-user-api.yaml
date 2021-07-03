@@ -62,6 +62,33 @@ paths:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetJobByIdLambdaFunction.Arn}/invocations
         passthroughBehavior: when_no_match
         httpMethod: POST
+  /v1/results/{job_id}:
+    get:
+      tags:
+      - result
+      operationId: get_result_by_job_id
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/result'
+        404:
+          description: result not found
+          content: {}
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetResultByJobIdLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
   /v1/devices/{name}:
     get:
       tags:
@@ -121,6 +148,14 @@ components:
           type: string
         results:
           type: string
+    result:
+      required:
+      - job_id
+      type: object
+      properties:
+        job_id:
+          type: string
+          description: a unique id of job
     device:
       required:
       - name
