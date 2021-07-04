@@ -32,46 +32,35 @@ provider:
   lambdaHashingVersion: 20201221
   #tracing: true
   environment:
-    #DYNAMODB_TABLE: horoscope-${self:provider.stage}
+    DYNAMODB_TABLE_JOB: ${self:custom.profile}-${self:provider.stage}-job
+    #DYNAMODB_TABLE_DEVICE: ${self:custom.profile}-${self:provider.stage}-device
     #IBMQ_TOKEN: ${ssm:/${self:custom.profile}/${self:provider.stage}/IBMQ_TOKEN}
-    #S3_BUCKET_NAME: ${self:custom.webSiteName}
-    #S3_TEMPLATE_KEY: "horoscope_template.html"
-    #S3_OUTPUT_KEY: "horoscope.html"
-    #SLACK_WEBHOOK_URL: ${ssm:/${self:custom.profile}/${self:provider.stage}/SLACK_WEBHOOK_URL}
+    S3_BUCKET_RESULT: ${self:custom.profile}-${self:provider.stage}-result
     STAGE: ${self:provider.stage}
   iam:
     role:
       statements:
-        #- Effect: Allow
-        #  Action:
-        #    - dynamodb:Query
-        #    - dynamodb:Scan
-        #    - dynamodb:GetItem
-        #    - dynamodb:PutItem
-        #    - dynamodb:UpdateItem
-        #    - dynamodb:DeleteItem
-        #  Resource:
-        #    - "Fn::GetAtt": [DynamoDbTable, Arn]
-        #- Effect: Allow
-        #  Action:
-        #    - s3:GetObject
-        #    - s3:PutObject
-        #  Resource:
-        #    - "Fn::GetAtt": [WebSiteS3Bucket, Arn]
-        #- Effect: Allow
-        #  Action:
-        #    - states:ListStateMachines
-        #    - states:StartExecution
-        #  Resource:
-        #    - arn:aws:states:${self:provider.region}:${ssm:/account}:stateMachine:*
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - "Fn::GetAtt": [DynamoDbTableJob, Arn]
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+          Resource:
+            - "Fn::GetAtt": [S3BucketResult, Arn]
         - Effect: Allow
           Action:
             - xray:PutTraceSegments
             - xray:PutTelemetryRecords
           Resource: "*"
-  #layers:
-  #  - arn:aws:lambda:${self:provider.region}:420165488524:layer:AWSLambda-Python37-SciPy1x:2
-  #  - ${cf:${self:custom.profile}-common-${self:provider.stage}.QiskitLambdaLayerQualifiedArn}
 
 package:
   patterns:
@@ -82,16 +71,59 @@ package:
 
 functions:
   UserApiSubmitJob:
-    handler: user_api_jobs.submit_job
+    handler: gaqqie_sky.user_api_jobs.submit_job
   UserApiGetJobById:
-    handler: user_api_jobs.get_job_by_id
+    handler: gaqqie_sky.user_api_jobs.get_job_by_id
   UserApiGetResultByJobId:
-    handler: user_api_jobs.get_result_by_job_id
+    handler: gaqqie_sky.user_api_jobs.get_result_by_job_id
   UserApiGetDeviceByName:
-    handler: user_api_devices.get_device_by_name
+    handler: gaqqie_sky.user_api_devices.get_device_by_name
 
 resources:
   Resources:
+    # DynamoDB
+    DynamoDbTableJob:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:provider.environment.DYNAMODB_TABLE_JOB}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        # on demand mode
+        BillingMode: PAY_PER_REQUEST
+
+    # S3
+    S3BucketResult:
+      Type: AWS::S3::Bucket
+      DeletionPolicy: Retain
+      Properties:
+        BucketName: ${self:provider.environment.S3_BUCKET_RESULT}
+        AccessControl: Private
+    S3BucketResultPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket:
+          Ref: S3BucketResult
+        PolicyDocument:
+          Statement:
+            - Sid: IamRoleLambdaGetObject
+              Effect: Allow
+              Principal:
+                AWS:
+                  Fn::GetAtt: [IamRoleLambdaExecution, Arn]
+              Action:
+                - s3:*
+                - s3:ListBucket
+                - s3:GetObject
+              Resource:
+                - arn:aws:s3:::${self:provider.environment.S3_BUCKET_RESULT}
+                - arn:aws:s3:::${self:provider.environment.S3_BUCKET_RESULT}/*
+
+    # API Gateway
     ApiGatewayRestApiUser:
       Type: "AWS::ApiGateway::RestApi"
       Properties:
