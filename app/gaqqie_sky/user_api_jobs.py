@@ -25,12 +25,13 @@ def submit_job(event, context):
         job_record["device_name"] = request_data["device_name"]
 
     if "instructions" in request_data:
-        instructions = request_data["instructions"]
+        job_record["instructions"] = request_data["instructions"]
     else:
         # TODO error
         pass
 
     # TODO validate job
+    job_json = json.dumps(job_record)
 
     # store to S3
     s3 = boto3.client("s3")
@@ -39,11 +40,25 @@ def submit_job(event, context):
     s3.put_object(
         Bucket=bucket_name,
         Key=instructions_key,
-        Body=instructions,
+        Body=job_json,
         ContentType="text/html",
     )
+    del job_record["instructions"]
 
-    # TODO send to SQS
+    # send to SQS
+    # TODO SQS doesn't need "status"
+    sqs = boto3.resource("sqs")
+    queue_name = os.environ["SQS_QUEUE_PREFIX"] + job_record["device_name"] + ".fifo"
+    print(f"queue_name={queue_name}")
+    queue = sqs.get_queue_by_name(QueueName=queue_name)
+    response = queue.send_message(
+        MessageBody=job_json,
+        MessageAttributes={"job_id": {"StringValue": job_id, "DataType": "String"}},
+        MessageGroupId=job_record["device_name"],
+        MessageDeduplicationId=job_id,
+    )
+    print(f"MessageId={response.get('MessageId')}")
+    job_record["queue_message_id"] = response.get("MessageId")
 
     # store to DynamoDB
     dynamodb = boto3.resource("dynamodb")
@@ -54,7 +69,7 @@ def submit_job(event, context):
     # return response
     response = {
         "statusCode": 200,
-        "body": json.dumps(job_record),
+        "body": job_json,
     }
     print(f"response={response}")
     return response

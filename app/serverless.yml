@@ -32,9 +32,10 @@ provider:
   lambdaHashingVersion: 20201221
   #tracing: true
   environment:
-    DYNAMODB_TABLE_JOB: ${self:custom.profile}-${self:provider.stage}-job
-    #DYNAMODB_TABLE_DEVICE: ${self:custom.profile}-${self:provider.stage}-device
     #IBMQ_TOKEN: ${ssm:/${self:custom.profile}/${self:provider.stage}/IBMQ_TOKEN}
+    #DYNAMODB_TABLE_DEVICE: ${self:custom.profile}-${self:provider.stage}-device
+    DYNAMODB_TABLE_JOB: ${self:custom.profile}-${self:provider.stage}-job
+    SQS_QUEUE_PREFIX: ${self:custom.profile}-${self:provider.stage}-
     S3_BUCKET_RESULT: ${self:custom.profile}-${self:provider.stage}-result
     STAGE: ${self:provider.stage}
   iam:
@@ -50,6 +51,14 @@ provider:
             - dynamodb:DeleteItem
           Resource:
             - "Fn::GetAtt": [DynamoDbTableJob, Arn]
+        - Effect: Allow
+          Action:
+            - sqs:GetQueueUrl
+            - sqs:SendMessage
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+          Resource:
+            - "Fn::GetAtt": [QueueJob, Arn]
         - Effect: Allow
           Action:
             - s3:GetObject
@@ -78,12 +87,16 @@ functions:
     handler: gaqqie_sky.user_api_jobs.get_result_by_job_id
   UserApiGetDeviceByName:
     handler: gaqqie_sky.user_api_devices.get_device_by_name
+  DeviceApiReceiveJob:
+    handler: gaqqie_sky.device_api_jobs.receive_job
+  DeviceApiRegisterResult:
+    handler: gaqqie_sky.device_api_jobs.register_result
 
 resources:
   Resources:
     # DynamoDB
     DynamoDbTableJob:
-      Type: 'AWS::DynamoDB::Table'
+      Type: "AWS::DynamoDB::Table"
       DeletionPolicy: Retain
       Properties:
         TableName: ${self:provider.environment.DYNAMODB_TABLE_JOB}
@@ -96,15 +109,26 @@ resources:
         # on demand mode
         BillingMode: PAY_PER_REQUEST
 
+    # SQS
+    QueueJob:
+      Type: "AWS::SQS::Queue"
+      Properties:
+        QueueName: ${self:provider.environment.SQS_QUEUE_PREFIX}qiskit_simulator.fifo
+        FifoQueue: true
+        # MaximumMessageSize: 262144 # 256KB(default)
+        ReceiveMessageWaitTimeSeconds: 0
+        ContentBasedDeduplication: true
+        MessageRetentionPeriod: 1209600 # 14 days(maximum limit)
+
     # S3
     S3BucketResult:
-      Type: AWS::S3::Bucket
+      Type: "AWS::S3::Bucket"
       DeletionPolicy: Retain
       Properties:
         BucketName: ${self:provider.environment.S3_BUCKET_RESULT}
         AccessControl: Private
     S3BucketResultPolicy:
-      Type: AWS::S3::BucketPolicy
+      Type: "AWS::S3::BucketPolicy"
       Properties:
         Bucket:
           Ref: S3BucketResult
@@ -123,13 +147,13 @@ resources:
                 - arn:aws:s3:::${self:provider.environment.S3_BUCKET_RESULT}
                 - arn:aws:s3:::${self:provider.environment.S3_BUCKET_RESULT}/*
 
-    # API Gateway
+    # API Gateway(user API)
     ApiGatewayRestApiUser:
       Type: "AWS::ApiGateway::RestApi"
       Properties:
         Body: ${file(./gaqqie-user-api.yaml)}
-    ApiGatewayDeployment:
-      Type: AWS::ApiGateway::Deployment
+    ApiGatewayDeploymentUser:
+      Type: "AWS::ApiGateway::Deployment"
       Properties:
         RestApiId:
           Ref: ApiGatewayRestApiUser
@@ -167,6 +191,36 @@ resources:
         FunctionName:
           Fn::GetAtt:
             - UserApiGetDeviceByNameLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
+
+    # API Gateway(device API)
+    ApiGatewayRestApiDevice:
+      Type: "AWS::ApiGateway::RestApi"
+      Properties:
+        Body: ${file(./gaqqie-device-api.yaml)}
+    ApiGatewayDeploymentDevice:
+      Type: "AWS::ApiGateway::Deployment"
+      Properties:
+        RestApiId:
+          Ref: ApiGatewayRestApiDevice
+        StageName: ${self:provider.stage}
+    DeviceApiReceiveJobPermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - DeviceApiReceiveJobLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
+    DeviceApiRegisterResultPermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - DeviceApiRegisterResultLambdaFunction
             - Arn
         Action: "lambda:InvokeFunction"
         Principal: "apigateway.amazonaws.com"
