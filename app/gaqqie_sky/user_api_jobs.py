@@ -100,17 +100,7 @@ def get_job_by_id(event, context):
         responce_data["name"] = job_record["name"]
     if "end_time" in job_record:
         responce_data["end_time"] = job_record["end_time"]
-    """
-    responce_data = {
-        "id": id,
-        "name": "sample job",
-        "status": "QUEUED",
-        "provider_name": "gaqqie",
-        "device_name": "qiskit_simulator",
-        "create_time": "2021-06-01T01:02:03.456Z",
-        "end_time": None,
-    }
-    """
+
     response = {
         "statusCode": 200,
         "body": json.dumps(responce_data),
