@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from decimal import Decimal
 import json
 import os
@@ -106,8 +106,7 @@ def register_result(event, context):
     status = request_data["status"]
     results = request_data["results"]
 
-    now = datetime.datetime.now()
-    end_time = now.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    end_time = datetime.now().isoformat(timespec="milliseconds") + "Z"
 
     # store to S3
     s3 = boto3.client("s3")

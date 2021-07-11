@@ -20,11 +20,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/job'
+              $ref: '#/components/schemas/jobbeforesubmission'
         required: true
       responses:
         200:
           description: successful queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/job'
         405:
           description: Invalid input
           content: {}
@@ -65,7 +69,7 @@ paths:
   /v1/results/{job_id}:
     get:
       tags:
-      - result
+      - job
       operationId: get_result_by_job_id
       parameters:
       - name: job_id
@@ -118,6 +122,20 @@ paths:
         httpMethod: POST
 components:
   schemas:
+    jobbeforesubmission:
+      required:
+      - device_name
+      - instructions
+      type: object
+      properties:
+        name:
+          type: string
+        provider_name:
+          type: string
+        device_name:
+          type: string
+        instructions:
+          type: string
     job:
       required:
       - id
@@ -144,10 +162,6 @@ components:
           type: string
         end_time:
           type: string
-        instructions:
-          type: string
-        results:
-          type: string
     result:
       required:
       - job_id
@@ -156,6 +170,8 @@ components:
         job_id:
           type: string
           description: a unique id of job
+        results:
+          type: string
     device:
       required:
       - name

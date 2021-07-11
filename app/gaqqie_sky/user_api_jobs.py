@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import json
 import os
 import uuid
@@ -13,8 +13,7 @@ def submit_job(event, context):
     request_data = json.loads(event["body"])
 
     job_id = str(uuid.uuid4())  # UTC
-    now = datetime.datetime.now()
-    create_time = now.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    create_time = datetime.now().isoformat(timespec="milliseconds") + "Z"
     job_record = {"id": job_id, "status": "QUEUED", "create_time": create_time}
 
     if "name" in request_data:
@@ -82,8 +81,26 @@ def get_job_by_id(event, context):
     id = event["pathParameters"]["id"]
 
     # get job from DynamoDB
+    dynamodb = boto3.resource("dynamodb")
+    job_table_name = os.environ["DYNAMODB_TABLE_JOB"]
+    job_table = dynamodb.Table(job_table_name)
+    dynamodb_response = job_table.get_item(Key={"id": id})
+    job_record = dynamodb_response["Item"]
+    print(f"job_record={job_record}")
 
     # return response
+    responce_data = {
+        "id": id,
+        "status": job_record["status"],
+        "provider_name": job_record["provider_name"],
+        "device_name": job_record["device_name"],
+        "create_time": job_record["create_time"],
+    }
+    if "name" in job_record:
+        responce_data["name"] = job_record["name"]
+    if "end_time" in job_record:
+        responce_data["end_time"] = job_record["end_time"]
+    """
     responce_data = {
         "id": id,
         "name": "sample job",
@@ -93,6 +110,7 @@ def get_job_by_id(event, context):
         "create_time": "2021-06-01T01:02:03.456Z",
         "end_time": None,
     }
+    """
     response = {
         "statusCode": 200,
         "body": json.dumps(responce_data),
@@ -108,11 +126,16 @@ def get_result_by_job_id(event, context):
     job_id = event["pathParameters"]["job_id"]
 
     # get result from S3
+    s3 = boto3.client("s3")
+    bucket_name = os.environ["S3_BUCKET_RESULT"]
+    results_key = "organization/user/" + job_id + "/results.json"
+    s3_response = s3.get_object(Bucket=bucket_name, Key=results_key)
+    results = s3_response["Body"].read().decode("utf-8")
 
     # return response
     responce_data = {
         "job_id": job_id,
-        "result": {"00": 498, "11": 502},
+        "results": results,
     }
     response = {
         "statusCode": 200,
