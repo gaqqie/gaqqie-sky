@@ -1,15 +1,15 @@
 openapi: 3.0.1
 info:
-  title: gaqqie device API
+  title: gaqqie provider API
   contact:
     email: tknsryk@gmail.com
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
-  version: 0.0.1
+  version: 0.1.0
 externalDocs:
-  description: TODO
-  url: http://swagger.io
+  description: gaqqie provider API
+  url: https://github.com/gaqqie/gaqqie-sky/blob/main/app/gaqqie-provider-api.yaml
 paths:
   /v1/jobs/{device_name}:
     get:
@@ -35,7 +35,7 @@ paths:
       x-amazon-apigateway-integration:
         type: aws_proxy
         uri:
-          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeviceApiReceiveJobLambdaFunction.Arn}/invocations
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProdiverApiReceiveJobLambdaFunction.Arn}/invocations
         passthroughBehavior: when_no_match
         httpMethod: POST
   /v1/results/{job_id}:
@@ -62,7 +62,7 @@ paths:
       x-amazon-apigateway-integration:
         type: aws_proxy
         uri:
-          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeviceApiRegisterResultLambdaFunction.Arn}/invocations
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProdiverApiRegisterResultLambdaFunction.Arn}/invocations
         passthroughBehavior: when_no_match
         httpMethod: POST
 components:

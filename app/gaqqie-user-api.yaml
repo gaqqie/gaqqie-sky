@@ -6,10 +6,10 @@ info:
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
-  version: 0.0.1
+  version: 0.1.0
 externalDocs:
-  description: TODO
-  url: http://swagger.io
+  description: gaqqie user API
+  url: https://github.com/gaqqie/gaqqie-sky/blob/main/app/gaqqie-user-api.yaml
 paths:
   /v1/jobs:
     post:

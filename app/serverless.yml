@@ -6,10 +6,6 @@ custom:
   #environment:
   #  dev: ${file(../conf/dev.yml)}
   #  prd: ${file(../conf/prd.yml)}
-  #webSiteName: ${self:custom.environment.${self:provider.stage}.webSiteName}
-  #s3Sync:
-  #  - bucketName: ${self:custom.webSiteName}
-  #    localDir: ../static
   lambdaRetry:
     - ErrorEquals:
         - Lambda.ServiceException
@@ -32,7 +28,6 @@ provider:
   lambdaHashingVersion: 20201221
   #tracing: true
   environment:
-    #IBMQ_TOKEN: ${ssm:/${self:custom.profile}/${self:provider.stage}/IBMQ_TOKEN}
     DYNAMODB_TABLE_DEVICE: ${self:custom.profile}-${self:provider.stage}-device
     DYNAMODB_TABLE_JOB: ${self:custom.profile}-${self:provider.stage}-job
     SQS_QUEUE_PREFIX: ${self:custom.profile}-${self:provider.stage}-
@@ -86,7 +81,7 @@ package:
     - "!node_modules/**"
     - "!tests/**"
     - "!__pycache__/**"
-    # "!json,yaml"
+    - "!json,yaml"
 
 functions:
   UserApiSubmitJob:
@@ -97,12 +92,12 @@ functions:
     handler: gaqqie_sky.user_api_jobs.get_result_by_job_id
   UserApiGetDeviceByName:
     handler: gaqqie_sky.user_api_devices.get_device_by_name
-  DeviceApiReceiveJob:
-    handler: gaqqie_sky.device_api_jobs.receive_job
-  DeviceApiRegisterResult:
-    handler: gaqqie_sky.device_api_jobs.register_result
-  DeviceApiRegisterDevice:
-    handler: gaqqie_sky.device_api_devices.register_device
+  ProdiverApiReceiveJob:
+    handler: gaqqie_sky.prodiver_api_jobs.receive_job
+  ProdiverApiRegisterResult:
+    handler: gaqqie_sky.prodiver_api_jobs.register_result
+  ProdiverApiRegisterDevice:
+    handler: gaqqie_sky.prodiver_api_devices.register_device
 
 resources:
   Resources:
@@ -220,37 +215,32 @@ resources:
         Action: "lambda:InvokeFunction"
         Principal: "apigateway.amazonaws.com"
 
-    # API Gateway(device API)
-    ApiGatewayRestApiDevice:
+    # API Gateway(prodiver API)
+    ApiGatewayRestApiProdiver:
       Type: "AWS::ApiGateway::RestApi"
       Properties:
-        Body: ${file(./gaqqie-device-api.yaml)}
-    ApiGatewayDeploymentDevice:
+        Body: ${file(./gaqqie-provider-api.yaml)}
+    ApiGatewayDeploymentProdiver:
       Type: "AWS::ApiGateway::Deployment"
       Properties:
         RestApiId:
-          Ref: ApiGatewayRestApiDevice
+          Ref: ApiGatewayRestApiProdiver
         StageName: ${self:provider.stage}
-    DeviceApiReceiveJobPermission:
+    ProdiverApiReceiveJobPermission:
       Type: "AWS::Lambda::Permission"
       Properties:
         FunctionName:
           Fn::GetAtt:
-            - DeviceApiReceiveJobLambdaFunction
+            - ProdiverApiReceiveJobLambdaFunction
             - Arn
         Action: "lambda:InvokeFunction"
         Principal: "apigateway.amazonaws.com"
-    DeviceApiRegisterResultPermission:
+    ProdiverApiRegisterResultPermission:
       Type: "AWS::Lambda::Permission"
       Properties:
         FunctionName:
           Fn::GetAtt:
-            - DeviceApiRegisterResultLambdaFunction
+            - ProdiverApiRegisterResultLambdaFunction
             - Arn
         Action: "lambda:InvokeFunction"
         Principal: "apigateway.amazonaws.com"
-
-#plugins:
-#  - serverless-s3-sync
-#  - serverless-step-functions
-#  - serverless-plugin-tracing
