@@ -2,11 +2,11 @@ openapi: 3.0.1
 info:
   title: gaqqie user API
   contact:
-    email: tknsryk@gmail.com
+    email: tknstyk@gmail.com
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
-  version: 0.1.0
+  version: 0.2.0
 externalDocs:
   description: gaqqie user API
   url: https://github.com/gaqqie/gaqqie-sky/blob/main/app/gaqqie-user-api.yaml
@@ -39,6 +39,25 @@ paths:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiSubmitJobLambdaFunction.Arn}/invocations
         passthroughBehavior: when_no_match
         httpMethod: POST
+    get:
+      tags:
+      - job
+      operationId: get_jobs
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema: 
+                type: array
+                items:
+                  $ref: '#/components/schemas/job'
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetJobsLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
   /v1/jobs/{id}:
     get:
       tags:
@@ -64,6 +83,33 @@ paths:
         type: aws_proxy
         uri:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetJobByIdLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+  /v1/jobs/{id}/cancel:
+    get:
+      tags:
+      - job
+      operationId: cancel_job_by_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/job'
+        404:
+          description: job not found
+          content: {}
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiCancelJobByIdLambdaFunction.Arn}/invocations
         passthroughBehavior: when_no_match
         httpMethod: POST
   /v1/results/{job_id}:
@@ -93,6 +139,26 @@ paths:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetResultByJobIdLambdaFunction.Arn}/invocations
         passthroughBehavior: when_no_match
         httpMethod: POST
+  /v1/devices:
+    get:
+      tags:
+      - device
+      operationId: get_devices
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema: 
+                type: array
+                items:
+                  $ref: '#/components/schemas/device'
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetDevicesLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
   /v1/devices/{name}:
     get:
       tags:
@@ -118,6 +184,26 @@ paths:
         type: aws_proxy
         uri:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetDeviceByNameLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+  /v1/providers:
+    get:
+      tags:
+      - provider
+      operationId: get_providers
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema: 
+                type: array
+                items:
+                  $ref: '#/components/schemas/provider'
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetProvidersLambdaFunction.Arn}/invocations
         passthroughBehavior: when_no_match
         httpMethod: POST
 components:
@@ -175,6 +261,10 @@ components:
     device:
       required:
       - name
+      - provider_name
+      - status
+      - num_qubits
+      - max_shots
       type: object
       properties:
         name:
@@ -188,6 +278,9 @@ components:
           - ACTIVE
           - SUBMITTABLE
           - UNSUBMITTABLE
+          default: ACTIVE
+        description:
+          type: string
         num_qubits:
           type: integer
           format: int32
@@ -199,4 +292,25 @@ components:
         queued_jobs:
           type: integer
           format: int32
-          minimum: 1
+          minimum: 0
+        details:
+          type: string
+    provider:
+      required:
+      - name
+      - status
+      type: object
+      properties:
+        name:
+          type: string
+          description: a unique name of provider
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - INACTIVE
+          default: ACTIVE
+        description:
+          type: string
+        details:
+          type: string

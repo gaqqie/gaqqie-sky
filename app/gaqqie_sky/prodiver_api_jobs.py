@@ -34,6 +34,7 @@ def _to_expression_attribute_values(job_record: dict) -> dict:
             expression_attribute_values[":" + key] = value
         else:
             expression_attribute_values[":" + key] = Decimal(value)
+
     return expression_attribute_values
 
 

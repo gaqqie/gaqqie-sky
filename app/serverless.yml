@@ -28,14 +28,26 @@ provider:
   lambdaHashingVersion: 20201221
   #tracing: true
   environment:
-    DYNAMODB_TABLE_DEVICE: ${self:custom.profile}-${self:provider.stage}-device
     DYNAMODB_TABLE_JOB: ${self:custom.profile}-${self:provider.stage}-job
+    DYNAMODB_TABLE_DEVICE: ${self:custom.profile}-${self:provider.stage}-device
+    DYNAMODB_TABLE_PROVIDER: ${self:custom.profile}-${self:provider.stage}-provider
     SQS_QUEUE_PREFIX: ${self:custom.profile}-${self:provider.stage}-
     S3_BUCKET_RESULT: ${self:custom.profile}-${self:provider.stage}-result
+    S3_BUCKET_PROVIDER: ${self:custom.profile}-${self:provider.stage}-provider
     STAGE: ${self:provider.stage}
   iam:
     role:
       statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - "Fn::GetAtt": [DynamoDbTableJob, Arn]
         - Effect: Allow
           Action:
             - dynamodb:Query
@@ -55,9 +67,10 @@ provider:
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
           Resource:
-            - "Fn::GetAtt": [DynamoDbTableJob, Arn]
+            - "Fn::GetAtt": [DynamoDbTableProvider, Arn]
         - Effect: Allow
           Action:
+            - sqs:GetQueueAttributes
             - sqs:GetQueueUrl
             - sqs:SendMessage
             - sqs:ReceiveMessage
@@ -70,6 +83,12 @@ provider:
             - s3:PutObject
           Resource:
             - "Fn::GetAtt": [S3BucketResult, Arn]
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+          Resource:
+            - "Fn::GetAtt": [S3BucketProvider, Arn]
         - Effect: Allow
           Action:
             - xray:PutTraceSegments
@@ -86,22 +105,49 @@ package:
 functions:
   UserApiSubmitJob:
     handler: gaqqie_sky.user_api_jobs.submit_job
+  UserApiGetJobs:
+    handler: gaqqie_sky.user_api_jobs.get_jobs
   UserApiGetJobById:
     handler: gaqqie_sky.user_api_jobs.get_job_by_id
+  UserApiCancelJobById:
+    handler: gaqqie_sky.user_api_jobs.cancel_job_by_id
   UserApiGetResultByJobId:
     handler: gaqqie_sky.user_api_jobs.get_result_by_job_id
+  UserApiGetDevices:
+    handler: gaqqie_sky.user_api_devices.get_devices
   UserApiGetDeviceByName:
     handler: gaqqie_sky.user_api_devices.get_device_by_name
+  UserApiGetProviders:
+    handler: gaqqie_sky.user_api_providers.get_providers
   ProdiverApiReceiveJob:
     handler: gaqqie_sky.prodiver_api_jobs.receive_job
   ProdiverApiRegisterResult:
     handler: gaqqie_sky.prodiver_api_jobs.register_result
   ProdiverApiRegisterDevice:
     handler: gaqqie_sky.prodiver_api_devices.register_device
+  ProdiverApiUpdateDevice:
+    handler: gaqqie_sky.prodiver_api_devices.update_device
+  ProdiverApiRegisterProvider:
+    handler: gaqqie_sky.prodiver_api_providers.register_provider
+  ProdiverApiUpdateProvider:
+    handler: gaqqie_sky.prodiver_api_providers.update_provider
 
 resources:
   Resources:
     # DynamoDB
+    DynamoDbTableJob:
+      Type: "AWS::DynamoDB::Table"
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:provider.environment.DYNAMODB_TABLE_JOB}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        # on demand mode
+        BillingMode: PAY_PER_REQUEST
     DynamoDbTableDevice:
       Type: "AWS::DynamoDB::Table"
       DeletionPolicy: Retain
@@ -115,16 +161,16 @@ resources:
             KeyType: HASH
         # on demand mode
         BillingMode: PAY_PER_REQUEST
-    DynamoDbTableJob:
+    DynamoDbTableProvider:
       Type: "AWS::DynamoDB::Table"
       DeletionPolicy: Retain
       Properties:
-        TableName: ${self:provider.environment.DYNAMODB_TABLE_JOB}
+        TableName: ${self:provider.environment.DYNAMODB_TABLE_PROVIDER}
         AttributeDefinitions:
-          - AttributeName: id
+          - AttributeName: name
             AttributeType: S
         KeySchema:
-          - AttributeName: id
+          - AttributeName: name
             KeyType: HASH
         # on demand mode
         BillingMode: PAY_PER_REQUEST
@@ -166,8 +212,33 @@ resources:
               Resource:
                 - arn:aws:s3:::${self:provider.environment.S3_BUCKET_RESULT}
                 - arn:aws:s3:::${self:provider.environment.S3_BUCKET_RESULT}/*
+    S3BucketProvider:
+      Type: "AWS::S3::Bucket"
+      DeletionPolicy: Retain
+      Properties:
+        BucketName: ${self:provider.environment.S3_BUCKET_PROVIDER}
+        AccessControl: Private
+    S3BucketProviderPolicy:
+      Type: "AWS::S3::BucketPolicy"
+      Properties:
+        Bucket:
+          Ref: S3BucketProvider
+        PolicyDocument:
+          Statement:
+            - Sid: IamRoleLambdaGetObject
+              Effect: Allow
+              Principal:
+                AWS:
+                  Fn::GetAtt: [IamRoleLambdaExecution, Arn]
+              Action:
+                - s3:*
+                - s3:ListBucket
+                - s3:GetObject
+              Resource:
+                - arn:aws:s3:::${self:provider.environment.S3_BUCKET_PROVIDER}
+                - arn:aws:s3:::${self:provider.environment.S3_BUCKET_PROVIDER}/*
 
-    # API Gateway(user API)
+    ### API Gateway(user API)
     ApiGatewayRestApiUser:
       Type: "AWS::ApiGateway::RestApi"
       Properties:
@@ -178,12 +249,31 @@ resources:
         RestApiId:
           Ref: ApiGatewayRestApiUser
         StageName: ${self:provider.stage}
+    # job interface
     UserApiSubmitJobPermission:
       Type: "AWS::Lambda::Permission"
       Properties:
         FunctionName:
           Fn::GetAtt:
             - UserApiSubmitJobLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
+    UserApiGetJobsPermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - UserApiGetJobsLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
+    UserApiCancelJobByIdPermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - UserApiCancelJobByIdLambdaFunction
             - Arn
         Action: "lambda:InvokeFunction"
         Principal: "apigateway.amazonaws.com"
@@ -205,6 +295,16 @@ resources:
             - Arn
         Action: "lambda:InvokeFunction"
         Principal: "apigateway.amazonaws.com"
+    # device interface
+    UserApiGetDevicesPermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - UserApiGetDevicesLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
     UserApiGetDeviceByNamePermission:
       Type: "AWS::Lambda::Permission"
       Properties:
@@ -214,8 +314,18 @@ resources:
             - Arn
         Action: "lambda:InvokeFunction"
         Principal: "apigateway.amazonaws.com"
+    # provider interface
+    UserApiGetProvidersPermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - UserApiGetProvidersLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
 
-    # API Gateway(prodiver API)
+    ### API Gateway(prodiver API)
     ApiGatewayRestApiProdiver:
       Type: "AWS::ApiGateway::RestApi"
       Properties:
@@ -226,6 +336,7 @@ resources:
         RestApiId:
           Ref: ApiGatewayRestApiProdiver
         StageName: ${self:provider.stage}
+    # job interface
     ProdiverApiReceiveJobPermission:
       Type: "AWS::Lambda::Permission"
       Properties:
@@ -241,6 +352,26 @@ resources:
         FunctionName:
           Fn::GetAtt:
             - ProdiverApiRegisterResultLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
+    # device interface
+    ProdiverApiUpdateDevicePermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - ProdiverApiUpdateDeviceLambdaFunction
+            - Arn
+        Action: "lambda:InvokeFunction"
+        Principal: "apigateway.amazonaws.com"
+    # provider interface
+    ProdiverApiUpdateProviderPermission:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - ProdiverApiUpdateProviderLambdaFunction
             - Arn
         Action: "lambda:InvokeFunction"
         Principal: "apigateway.amazonaws.com"

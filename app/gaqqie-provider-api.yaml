@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: gaqqie provider API
   contact:
-    email: tknsryk@gmail.com
+    email: tknstyk@gmail.com
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
@@ -65,6 +65,66 @@ paths:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProdiverApiRegisterResultLambdaFunction.Arn}/invocations
         passthroughBehavior: when_no_match
         httpMethod: POST
+  /v1/devices/{name}:
+    post:
+      tags:
+      - device
+      operationId: update_device
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/device'
+        required: true
+      responses:
+        200:
+          description: successful operation
+          content: {}
+        404:
+          description: device not found
+          content: {}
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProdiverApiUpdateDeviceLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+  /v1/providers/{name}:
+    post:
+      tags:
+      - provider
+      operationId: update_provider
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/provider'
+        required: true
+      responses:
+        200:
+          description: successful operation
+          content: {}
+        404:
+          description: provider not found
+          content: {}
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProdiverApiUpdateProviderLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
 components:
   schemas:
     job:
@@ -88,6 +148,9 @@ components:
     result:
       required:
       - job_id
+      - status
+      - end_time
+      - results
       type: object
       properties:
         job_id:
@@ -101,4 +164,52 @@ components:
         end_time:
           type: string
         results:
+          type: string
+    device:
+      required:
+      - name
+      - provider_name
+      - status
+      - num_qubits
+      - max_shots
+      type: object
+      properties:
+        name:
+          type: string
+          description: a unique name of device
+        provider_name:
+          type: string
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - SUBMITTABLE
+          - UNSUBMITTABLE
+          default: ACTIVE
+        description:
+          type: string
+        num_qubits:
+          type: integer
+        max_shots:
+          type: integer
+        details:
+          type: string
+    provider:
+      required:
+      - name
+      - status
+      type: object
+      properties:
+        name:
+          type: string
+          description: a unique name of provider
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - INACTIVE
+          default: ACTIVE
+        description:
+          type: string
+        details:
           type: string

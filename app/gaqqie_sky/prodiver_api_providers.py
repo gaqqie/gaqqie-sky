@@ -15,6 +15,7 @@ def _to_update_expression(provider_record: dict) -> str:
             update_expression_parts.append(key + "=:" + key)
 
     update_expression = "set " + ", ".join(update_expression_parts)
+    print(f"update_expression={update_expression}")
     return update_expression
 
 
@@ -24,35 +25,34 @@ def _to_expression_attribute_names(provider_record: dict) -> str:
         if key == "status":
             expression_attribute_names["#" + key] = key
 
+    print(f"expression_attribute_names={expression_attribute_names}")
     return expression_attribute_names
 
 
 def _to_expression_attribute_values(provider_record: dict) -> dict:
     expression_attribute_values = {}
     for key, value in provider_record.items():
-        if key in ["provider_name", "status", "description"]:
+        if key in ["status", "description"]:
             expression_attribute_values[":" + key] = value
         else:
             expression_attribute_values[":" + key] = Decimal(value)
 
+    print(f"expression_attribute_values={expression_attribute_values}")
     return expression_attribute_values
 
 
-def register_device(event, context):
-    # get device from DynamoDB
+def register_provider(event, context):
+    # get provider from DynamoDB
     dynamodb = boto3.resource("dynamodb")
-    device_table_name = os.environ["DYNAMODB_TABLE_DEVICE"]
-    device_table = dynamodb.Table(device_table_name)
+    provider_table_name = os.environ["DYNAMODB_TABLE_PROVIDER"]
+    provider_table = dynamodb.Table(provider_table_name)
 
-    device_record = {
-        "name": "qiskit_simulator",
-        "provider_name": "gaqqie",
+    provider_record = {
+        "name": "gaqqie",
         "status": "ACTIVE",
-        "description": "",
-        "num_qubits": 10,
-        "max_shots": 1024,
+        "description": "a provider for test",
     }
-    device_table.put_item(Item=device_record)
+    provider_table.put_item(Item=provider_record)
 
     # return response
     response = {
@@ -61,35 +61,31 @@ def register_device(event, context):
     return response
 
 
-def update_device(event, context):
+def update_provider(event, context):
     # parse request
     name = event["pathParameters"]["name"]
     request_data = json.loads(event["body"])
-    provider_name = request_data["provider_name"]
     status = request_data["status"]
     description = request_data["description"]
-    num_qubits = request_data["num_qubits"]
-    max_shots = request_data["max_shots"]
 
     # update to DynamoDB
     dynamodb = boto3.resource("dynamodb")
-    device_table_name = os.environ["DYNAMODB_TABLE_DEVICE"]
-    device_table = dynamodb.Table(device_table_name)
+    provider_table_name = os.environ["DYNAMODB_TABLE_PROVIDER"]
+    provider_table = dynamodb.Table(provider_table_name)
 
-    device_record = {
-        "provider_name": provider_name,
+    provider_record = {
         "status": status,
         "description": description,
-        "num_qubits": num_qubits,
-        "max_shots": max_shots,
     }
-    device_table.update_item(
+    print(f"name={name}")
+    print(f"provider_record={provider_record}")
+    provider_table.update_item(
         Key={
             "name": name,
         },
-        UpdateExpression=_to_update_expression(device_record),
-        ExpressionAttributeNames=_to_expression_attribute_names(device_record),
-        ExpressionAttributeValues=_to_expression_attribute_values(device_record),
+        UpdateExpression=_to_update_expression(provider_record),
+        ExpressionAttributeNames=_to_expression_attribute_names(provider_record),
+        ExpressionAttributeValues=_to_expression_attribute_values(provider_record),
         ReturnValues="UPDATED_NEW",
     )
 
