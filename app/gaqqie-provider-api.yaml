@@ -6,7 +6,7 @@ info:
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
-  version: 0.1.0
+  version: 0.2.0
 externalDocs:
   description: gaqqie provider API
   url: https://github.com/gaqqie/gaqqie-sky/blob/main/app/gaqqie-provider-api.yaml
@@ -149,7 +149,6 @@ components:
       required:
       - job_id
       - status
-      - end_time
       - results
       type: object
       properties:
@@ -190,8 +189,12 @@ components:
           type: string
         num_qubits:
           type: integer
+          format: int32
+          minimum: 1
         max_shots:
           type: integer
+          format: int32
+          minimum: 1
         details:
           type: string
     provider:

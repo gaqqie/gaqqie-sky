@@ -1,19 +1,14 @@
 import json
 import os
 
-import boto3
+from gaqqie_sky.resource import db
 
 
 def get_providers(event, context):
     print(f"event={event}")
 
-    # get device from DynamoDB
-    dynamodb = boto3.resource("dynamodb")
-    provider_table_name = os.environ["DYNAMODB_TABLE_PROVIDER"]
-    provider_table = dynamodb.Table(provider_table_name)
-    dynamodb_response = provider_table.scan()
-    provider_records = dynamodb_response["Items"]
-    print(f"provider_record={provider_records}")
+    # get provider from DynamoDB
+    provider_records = db.find_all(os.environ["DYNAMODB_TABLE_PROVIDER"])
 
     # return response
     responce_data = []
@@ -39,22 +34,25 @@ def get_provider_by_name(event, context):
     provider_name = event["pathParameters"]["name"]
 
     # get device from DynamoDB
-    dynamodb = boto3.resource("dynamodb")
-    provider_table_name = os.environ["DYNAMODB_TABLE_PROVIDER"]
-    provider_table = dynamodb.Table(provider_table_name)
-    dynamodb_response = provider_table.get_item(Key={"name": provider_name})
-    provider_record = dynamodb_response["Item"]
-    print(f"provider_record={provider_record}")
+    provider_record = db.find_by_id(
+        os.environ["DYNAMODB_TABLE_PROVIDER"], provider_name, key_field_name="name"
+    )
 
     # return response
-    responce_data = {
-        "name": provider_record["name"],
-        "status": provider_record["status"],
-        "description": provider_record["description"],
-    }
-    response = {
-        "statusCode": 200,
-        "body": json.dumps(responce_data),
-    }
+    if provider_record:
+        # construct response data
+        responce_data = {
+            "name": provider_record["name"],
+            "status": provider_record["status"],
+            "description": provider_record["description"],
+        }
+        response = {
+            "statusCode": 200,
+            "body": json.dumps(responce_data),
+        }
+    else:
+        response = {
+            "statusCode": 200,
+        }
     print(f"response={response}")
     return response
