@@ -19,6 +19,18 @@ def _get_resource(resource_name: str):
 
 
 def get_queue(queue_name: str):
+    """returns specific queue.
+
+    Parameters
+    ----------
+    queue_name : str
+        queue name
+
+    Returns
+    -------
+    [type]
+        specific queue object.
+    """
     return _get_resource(queue_name)
 
 
@@ -28,7 +40,28 @@ def send(
     attributes: dict,
     group_id: str,
     deduplication_id: str,
-) -> dict():
+) -> dict:
+    """send a message.
+
+    Parameters
+    ----------
+    queue_name : str
+        queue name.
+    message : str
+        message.
+    attributes : dict
+        dict of message attributes.
+    group_id : str
+        group id.
+    deduplication_id : str
+        deduplication id.
+
+    Returns
+    -------
+    dict
+        return value from queue.
+        it contains "queue_message_id"(unique id of message).
+    """
     queue = _get_resource(queue_name)
     response = queue.send_message(
         MessageBody=message,
@@ -41,8 +74,25 @@ def send(
 
 def receive(
     queue_name: str, message_attribute_names: List[str], max_number_of_messages: int = 1
-) -> dict:
-    # get messages from SQS
+) -> List[dict]:
+    """receive message.
+
+    Parameters
+    ----------
+    queue_name : str
+        queue name.
+    message_attribute_names : List[str]
+        message attribute names to receive.
+    max_number_of_messages : int, optional
+        max number of messages to receive, by default 1
+
+    Returns
+    -------
+    dict
+        list of messages.
+        if messages don't exist, returns the list of length zero.
+    """
+    # get messages from queue
     queue = _get_resource(queue_name)
     messages = queue.receive_messages(
         MessageAttributeNames=message_attribute_names,

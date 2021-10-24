@@ -18,6 +18,20 @@ def _get_resource():
 
 
 def get(bucket_name: str, key: str) -> str:
+    """get data from the storage.
+
+    Parameters
+    ----------
+    bucket_name : str
+        bucket name to get data.
+    key : str
+        key of data.
+
+    Returns
+    -------
+    str
+        data.
+    """
     s3 = _get_resource()
     s3_response = s3.get_object(Bucket=bucket_name, Key=key)
     data = s3_response["Body"].read().decode("utf-8")
@@ -25,10 +39,21 @@ def get(bucket_name: str, key: str) -> str:
 
 
 def put(bucket_name: str, key: str, data: str) -> None:
+    """put data to the storage.
+
+    Parameters
+    ----------
+    bucket_name : str
+        bucket name to put data.
+    key : str
+        key of data.
+    data : str
+        value of data.
+    """
     s3 = _get_resource()
     s3.put_object(
         Bucket=bucket_name,
         Key=key,
         Body=data,
-        ContentType="text/html",
+        ContentType="text/json",
     )

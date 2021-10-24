@@ -206,6 +206,33 @@ paths:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetProvidersLambdaFunction.Arn}/invocations
         passthroughBehavior: when_no_match
         httpMethod: POST
+  /v1/providers/{name}:
+    get:
+      tags:
+      - provider
+      operationId: get_provider_by_name
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/provider'
+        404:
+          description: name not found
+          content: {}
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetProviderByNameLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
 components:
   schemas:
     jobbeforesubmission:

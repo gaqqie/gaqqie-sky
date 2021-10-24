@@ -1,10 +1,25 @@
 import json
-import os
 
 from gaqqie_sky.resource import db
+from gaqqie_sky.resource import storage
+import gaqqie_sky.resource.name_resolver as resolver
 
 
-def register_device(event, context):
+def register_device(event: dict, context: "LambdaContext") -> dict:
+    """register device information.
+
+    Parameters
+    ----------
+    event : dict
+        event object.
+    context : LambdaContext
+        context object.
+
+    Returns
+    -------
+    dict
+        dict corresponding to http response.
+    """
     device_record = {
         "name": "qiskit_simulator",
         "provider_name": "gaqqie",
@@ -13,7 +28,14 @@ def register_device(event, context):
         "num_qubits": 10,
         "max_shots": 1024,
     }
-    db.insert(os.environ["DYNAMODB_TABLE_DEVICE"], device_record)
+    db.insert(resolver.table_device(), device_record)
+
+    # update details on storage
+    storage.put(
+        resolver.storage_bucket_device(),
+        resolver.storage_key_device("gaqqie", "qiskit_simulator"),
+        "{}",
+    )
 
     # return response
     response = {
@@ -22,7 +44,23 @@ def register_device(event, context):
     return response
 
 
-def update_device(event, context):
+def update_device(event: dict, context: "LambdaContext") -> dict:
+    """update device information.
+
+    If the device does not exist, registers it.
+
+    Parameters
+    ----------
+    event : dict
+        event object.
+    context : LambdaContext
+        context object.
+
+    Returns
+    -------
+    dict
+        dict corresponding to http response.
+    """
     # parse request
     name = event["pathParameters"]["name"]
     request_data = json.loads(event["body"])
@@ -32,7 +70,7 @@ def update_device(event, context):
     num_qubits = request_data["num_qubits"]
     max_shots = request_data["max_shots"]
 
-    # update to DynamoDB
+    # update to database
     device_record = {
         "provider_name": provider_name,
         "status": status,
@@ -40,7 +78,15 @@ def update_device(event, context):
         "num_qubits": num_qubits,
         "max_shots": max_shots,
     }
-    db.update(os.environ["DYNAMODB_TABLE_DEVICE"], {"name": name}, device_record)
+    db.update(resolver.table_device(), {"name": name}, device_record)
+
+    # update details on storage
+    if "details" in request_data:
+        storage.put(
+            resolver.storage_bucket_device(),
+            resolver.storage_key_device(provider_name, name),
+            request_data["details"],
+        )
 
     # return response
     response = {

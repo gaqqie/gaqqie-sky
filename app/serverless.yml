@@ -28,12 +28,12 @@ provider:
   lambdaHashingVersion: 20201221
   #tracing: true
   environment:
-    DYNAMODB_TABLE_JOB: ${self:custom.profile}-${self:provider.stage}-job
-    DYNAMODB_TABLE_DEVICE: ${self:custom.profile}-${self:provider.stage}-device
-    DYNAMODB_TABLE_PROVIDER: ${self:custom.profile}-${self:provider.stage}-provider
-    SQS_QUEUE_PREFIX: ${self:custom.profile}-${self:provider.stage}-
-    S3_BUCKET_RESULT: ${self:custom.profile}-${self:provider.stage}-result
-    S3_BUCKET_PROVIDER: ${self:custom.profile}-${self:provider.stage}-provider
+    TABLE_JOB: ${self:custom.profile}-${self:provider.stage}-job
+    TABLE_DEVICE: ${self:custom.profile}-${self:provider.stage}-device
+    TABLE_PROVIDER: ${self:custom.profile}-${self:provider.stage}-provider
+    QUEUE_PREFIX: ${self:custom.profile}-${self:provider.stage}-
+    BUCKET_RESULT: ${self:custom.profile}-${self:provider.stage}-result
+    BUCKET_PROVIDER: ${self:custom.profile}-${self:provider.stage}-provider
     STAGE: ${self:provider.stage}
   iam:
     role:
@@ -119,6 +119,8 @@ functions:
     handler: gaqqie_sky.user_api_devices.get_device_by_name
   UserApiGetProviders:
     handler: gaqqie_sky.user_api_providers.get_providers
+  UserApiGetProviderByName:
+    handler: gaqqie_sky.user_api_providers.get_provider_by_name
   ProdiverApiReceiveJob:
     handler: gaqqie_sky.prodiver_api_jobs.receive_job
   ProdiverApiRegisterResult:
@@ -139,7 +141,7 @@ resources:
       Type: "AWS::DynamoDB::Table"
       DeletionPolicy: Retain
       Properties:
-        TableName: ${self:provider.environment.DYNAMODB_TABLE_JOB}
+        TableName: ${self:provider.environment.TABLE_JOB}
         AttributeDefinitions:
           - AttributeName: id
             AttributeType: S
@@ -152,7 +154,7 @@ resources:
       Type: "AWS::DynamoDB::Table"
       DeletionPolicy: Retain
       Properties:
-        TableName: ${self:provider.environment.DYNAMODB_TABLE_DEVICE}
+        TableName: ${self:provider.environment.TABLE_DEVICE}
         AttributeDefinitions:
           - AttributeName: name
             AttributeType: S
@@ -165,7 +167,7 @@ resources:
       Type: "AWS::DynamoDB::Table"
       DeletionPolicy: Retain
       Properties:
-        TableName: ${self:provider.environment.DYNAMODB_TABLE_PROVIDER}
+        TableName: ${self:provider.environment.TABLE_PROVIDER}
         AttributeDefinitions:
           - AttributeName: name
             AttributeType: S
@@ -179,7 +181,7 @@ resources:
     QueueJob:
       Type: "AWS::SQS::Queue"
       Properties:
-        QueueName: ${self:provider.environment.SQS_QUEUE_PREFIX}qiskit_simulator.fifo
+        QueueName: ${self:provider.environment.QUEUE_PREFIX}qiskit_simulator.fifo
         FifoQueue: true
         # MaximumMessageSize: 262144 # 256KB(default)
         ReceiveMessageWaitTimeSeconds: 0
@@ -191,7 +193,7 @@ resources:
       Type: "AWS::S3::Bucket"
       DeletionPolicy: Retain
       Properties:
-        BucketName: ${self:provider.environment.S3_BUCKET_RESULT}
+        BucketName: ${self:provider.environment.BUCKET_RESULT}
         AccessControl: Private
     S3BucketResultPolicy:
       Type: "AWS::S3::BucketPolicy"
@@ -210,13 +212,13 @@ resources:
                 - s3:ListBucket
                 - s3:GetObject
               Resource:
-                - arn:aws:s3:::${self:provider.environment.S3_BUCKET_RESULT}
-                - arn:aws:s3:::${self:provider.environment.S3_BUCKET_RESULT}/*
+                - arn:aws:s3:::${self:provider.environment.BUCKET_RESULT}
+                - arn:aws:s3:::${self:provider.environment.BUCKET_RESULT}/*
     S3BucketProvider:
       Type: "AWS::S3::Bucket"
       DeletionPolicy: Retain
       Properties:
-        BucketName: ${self:provider.environment.S3_BUCKET_PROVIDER}
+        BucketName: ${self:provider.environment.BUCKET_PROVIDER}
         AccessControl: Private
     S3BucketProviderPolicy:
       Type: "AWS::S3::BucketPolicy"
@@ -235,8 +237,8 @@ resources:
                 - s3:ListBucket
                 - s3:GetObject
               Resource:
-                - arn:aws:s3:::${self:provider.environment.S3_BUCKET_PROVIDER}
-                - arn:aws:s3:::${self:provider.environment.S3_BUCKET_PROVIDER}/*
+                - arn:aws:s3:::${self:provider.environment.BUCKET_PROVIDER}
+                - arn:aws:s3:::${self:provider.environment.BUCKET_PROVIDER}/*
 
     ### API Gateway(user API)
     ApiGatewayRestApiUser:

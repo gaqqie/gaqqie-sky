@@ -19,11 +19,32 @@ def _get_resource(resource_name: str):
 
 
 def insert(table_name: str, record: dict) -> None:
+    """insert a record.
+
+    Parameters
+    ----------
+    table_name : str
+        table name to insert record.
+    record : dict
+        record to insert.
+    """
     table = _get_resource(table_name)
     table.put_item(Item=record)
 
 
 def find_all(table_name: str) -> List[dict]:
+    """find all records.
+
+    Parameters
+    ----------
+    table_name : str
+        table name to find records.
+
+    Returns
+    -------
+    List[dict]
+        list of records.
+    """
     table = _get_resource(table_name)
     items = table.scan()
     if "Items" in items:
@@ -34,6 +55,22 @@ def find_all(table_name: str) -> List[dict]:
 
 
 def find_by_id(table_name: str, key: str, key_field_name: str = "id") -> dict:
+    """find specific record.
+
+    Parameters
+    ----------
+    table_name : str
+        table name to find the record.
+    key : str
+        the key that identifies the record.
+    key_field_name : str, optional
+        field name of the key, by default "id".
+
+    Returns
+    -------
+    dict
+        record.
+    """
     table = _get_resource(table_name)
     item = table.get_item(Key={key_field_name: key})
     if "Item" in item:
@@ -76,6 +113,18 @@ def _to_expression_attribute_values(job_record: dict) -> dict:
 
 
 def update(table_name: str, key: dict, item: dict) -> None:
+    """update specific record.
+
+    Parameters
+    ----------
+    table_name : str
+        table name to update the record.
+    key : dict
+        dict of the key that identifies the record.
+    item : dict
+        dict of the item to update.
+        this item must consist of updated fields.
+    """
     table = _get_resource(table_name)
 
     table.update_item(

@@ -1,20 +1,34 @@
 import json
-import os
 
 from gaqqie_sky.resource import db
 from gaqqie_sky.resource import queue
 from gaqqie_sky.resource import storage
 from gaqqie_sky.common import util
+import gaqqie_sky.resource.name_resolver as resolver
 
 
-def receive_job(event, context):
+def receive_job(event: dict, context: "LambdaContext") -> dict:
+    """receive job.
+
+    Parameters
+    ----------
+    event : dict
+        event object.
+    context : LambdaContext
+        context object.
+
+    Returns
+    -------
+    dict
+        dict corresponding to http response.
+    """
     print(f"event={event}")
 
     # parse request
     device_name = event["pathParameters"]["device_name"]
 
-    # receive a message from SQS
-    queue_name = os.environ["SQS_QUEUE_PREFIX"] + device_name + ".fifo"
+    # receive a message from queue
+    queue_name = resolver.queue_device(device_name)
     while True:
         messages = queue.receive(queue_name, ["job_id"], 1)
 
@@ -31,7 +45,7 @@ def receive_job(event, context):
         message.delete()
 
         # check job status
-        job_record = db.find_by_id(os.environ["DYNAMODB_TABLE_JOB"], job_id)
+        job_record = db.find_by_id(resolver.table_job(), job_id)
         if job_record is None:
             continue
         elif job_record["status"] in ["SUCCEEDED", "CANCELLED", "FAILED"]:
@@ -41,7 +55,7 @@ def receive_job(event, context):
         job_record = {
             "status": "RUNNING",
         }
-        db.update(os.environ["DYNAMODB_TABLE_JOB"], {"id": job_id}, job_record)
+        db.update(resolver.table_job(), {"id": job_id}, job_record)
 
         # return response
         response = {
@@ -54,7 +68,21 @@ def receive_job(event, context):
     return response
 
 
-def register_result(event, context):
+def register_result(event: dict, context: "LambdaContext") -> dict:
+    """register result of job.
+
+    Parameters
+    ----------
+    event : dict
+        event object.
+    context : LambdaContext
+        context object.
+
+    Returns
+    -------
+    dict
+        dict corresponding to http response.
+    """
     print(f"event={event}")
 
     # parse request
@@ -65,18 +93,16 @@ def register_result(event, context):
 
     # store to S3
     storage.put(
-        os.environ["S3_BUCKET_RESULT"],
-        "organization/user/" + job_id + "/results.json",
-        results,
+        resolver.storage_bucket_result(), resolver.storage_key_results(job_id), results
     )
 
-    # update to DynamoDB
+    # update to database
     end_time = util.get_datetime_str()
     job_record = {
         "status": status,
         "end_time": end_time,
     }
-    db.update(os.environ["DYNAMODB_TABLE_JOB"], {"id": job_id}, job_record)
+    db.update(resolver.table_job(), {"id": job_id}, job_record)
 
     # return response
     response = {

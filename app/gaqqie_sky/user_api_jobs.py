@@ -1,18 +1,27 @@
-from datetime import datetime
-from decimal import Decimal
 import json
-import os
-import uuid
-
-import boto3
 
 from gaqqie_sky.common import util
 from gaqqie_sky.resource import db
 from gaqqie_sky.resource import queue
 from gaqqie_sky.resource import storage
+import gaqqie_sky.resource.name_resolver as resolver
 
 
-def submit_job(event, context):
+def submit_job(event: dict, context: "LambdaContext") -> dict:
+    """submit job.
+
+    Parameters
+    ----------
+    event : dict
+        event object.
+    context : LambdaContext
+        context object.
+
+    Returns
+    -------
+    dict
+        dict corresponding to http response.
+    """
     print(f"event={event}")
 
     # parse job
@@ -40,15 +49,15 @@ def submit_job(event, context):
 
     # store to S3
     storage.put(
-        os.environ["S3_BUCKET_RESULT"],
-        "organization/user/" + job_id + "/instructions.json",
+        resolver.storage_bucket_result(),
+        resolver.storage_key_instructions(job_id),
         job_json,
     )
     del job_record["instructions"]
 
-    # send to SQS
-    # TODO SQS doesn't need "status"
-    queue_name = os.environ["SQS_QUEUE_PREFIX"] + job_record["device_name"] + ".fifo"
+    # send to queue
+    # TODO queue doesn't need "status"
+    queue_name = resolver.queue_device(job_record["device_name"])
     response = queue.send(
         queue_name,
         job_json,
@@ -59,8 +68,8 @@ def submit_job(event, context):
     print(f"MessageId={response.get('MessageId')}")
     job_record["queue_message_id"] = response.get("MessageId")
 
-    # store to DynamoDB
-    db.insert(os.environ["DYNAMODB_TABLE_JOB"], job_record)
+    # store to database
+    db.insert(resolver.table_job(), job_record)
 
     # return response
     response = {
@@ -71,11 +80,25 @@ def submit_job(event, context):
     return response
 
 
-def get_jobs(event, context):
+def get_jobs(event: dict, context: "LambdaContext") -> dict:
+    """get job informations.
+
+    Parameters
+    ----------
+    event : dict
+        event object.
+    context : LambdaContext
+        context object.
+
+    Returns
+    -------
+    dict
+        dict corresponding to http response.
+    """
     print(f"event={event}")
 
-    # get job from DynamoDB
-    job_records = db.find_all(os.environ["DYNAMODB_TABLE_JOB"])
+    # get job from database
+    job_records = db.find_all(resolver.table_job())
 
     # return response
     responce_data = []
@@ -96,14 +119,28 @@ def get_jobs(event, context):
     return response
 
 
-def get_job_by_id(event, context):
+def get_job_by_id(event: dict, context: "LambdaContext") -> dict:
+    """get specific job information.
+
+    Parameters
+    ----------
+    event : dict
+        event object.
+    context : LambdaContext
+        context object.
+
+    Returns
+    -------
+    dict
+        dict corresponding to http response.
+    """
     print(f"event={event}")
 
     # parse request
     id = event["pathParameters"]["id"]
 
-    # get job from DynamoDB
-    job_record = db.find_by_id(os.environ["DYNAMODB_TABLE_JOB"], id)
+    # get job from database
+    job_record = db.find_by_id(resolver.table_job(), id)
 
     # return response
     if job_record:
@@ -133,23 +170,37 @@ def get_job_by_id(event, context):
     return response
 
 
-def cancel_job_by_id(event, context):
+def cancel_job_by_id(event: dict, context: "LambdaContext") -> dict:
+    """cancel specific job.
+
+    Parameters
+    ----------
+    event : dict
+        event object.
+    context : LambdaContext
+        context object.
+
+    Returns
+    -------
+    dict
+        dict corresponding to http response.
+    """
     print(f"event={event}")
 
     # parse request
     id = event["pathParameters"]["id"]
 
-    # get job from DynamoDB
-    job_record = db.find_by_id(os.environ["DYNAMODB_TABLE_JOB"], id)
+    # get job from database
+    job_record = db.find_by_id(resolver.table_job(), id)
 
     if job_record:
-        # update to DynamoDB
+        # update database
         end_time = util.get_datetime_str()
         new_job_record = {
             "status": "CANCELLED",
             "end_time": end_time,
         }
-        db.update(os.environ["DYNAMODB_TABLE_JOB"], {"id": id}, new_job_record)
+        db.update(resolver.table_job(), {"id": id}, new_job_record)
 
         # return response
         responce_data = {
@@ -175,15 +226,30 @@ def cancel_job_by_id(event, context):
     return response
 
 
-def get_result_by_job_id(event, context):
+def get_result_by_job_id(event: dict, context: "LambdaContext") -> dict:
+    """get result of specific job.
+
+    Parameters
+    ----------
+    event : dict
+        event object.
+    context : LambdaContext
+        context object.
+
+    Returns
+    -------
+    dict
+        dict corresponding to http response.
+    """
     print(f"event={event}")
 
     # parse request
     job_id = event["pathParameters"]["job_id"]
 
-    # get result from S3
+    # get result from storage
     results = storage.get(
-        os.environ["S3_BUCKET_RESULT"], "organization/user/" + job_id + "/results.json"
+        resolver.storage_bucket_result(),
+        resolver.storage_key_results(job_id),
     )
 
     # return response
