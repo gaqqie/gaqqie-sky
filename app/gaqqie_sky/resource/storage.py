@@ -38,6 +38,27 @@ def get(bucket_name: str, key: str) -> str:
     return data
 
 
+def get_binary(bucket_name: str, key: str) -> str:
+    """get binary data from the storage.
+
+    Parameters
+    ----------
+    bucket_name : str
+        bucket name to get binary data.
+    key : str
+        key of binary data.
+
+    Returns
+    -------
+    str
+        binary data.
+    """
+    s3 = _get_resource()
+    s3_response = s3.get_object(Bucket=bucket_name, Key=key)
+    data = s3_response["Body"].read()
+    return data
+
+
 def put(bucket_name: str, key: str, data: str) -> None:
     """put data to the storage.
 

@@ -1,0 +1,2 @@
+boto3
+qiskit-ibmq-provider==0.18.3

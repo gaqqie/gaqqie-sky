@@ -1,0 +1,9 @@
+webSiteName: gaqqie-web
+region: ap-northeast-1
+ibm:
+  ibmq_token: "write your token"
+  image:
+    InnnerApiSubmitJobToIbm: "write key of ecr iamge"
+    InnnerApiPollJobToIbm: "write key of ecr iamge"
+  schedule:
+    InnnerApiPollJobToIbm: false

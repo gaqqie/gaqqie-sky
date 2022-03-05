@@ -22,3 +22,12 @@ def get_datetime_str() -> str:
         a date/time string in ISO format.
     """
     return datetime.now().isoformat(timespec="milliseconds") + "Z"
+
+
+def get_cors_response_headers() -> dict:
+    headers = {
+        "Access-Control-Allow-Headers": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+    }
+    return headers

@@ -84,6 +84,7 @@ def register_result(event: dict, context: "LambdaContext") -> dict:
         dict corresponding to http response.
     """
     print(f"event={event}")
+    print(f"function_name={context.function_name}")
 
     # parse request
     job_id = event["pathParameters"]["job_id"]
@@ -93,7 +94,9 @@ def register_result(event: dict, context: "LambdaContext") -> dict:
 
     # store to S3
     storage.put(
-        resolver.storage_bucket_result(), resolver.storage_key_results(job_id), results
+        resolver.storage_bucket_result(),
+        resolver.storage_key_results(job_id),
+        results,
     )
 
     # update to database

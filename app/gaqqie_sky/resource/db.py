@@ -104,7 +104,15 @@ def _to_expression_attribute_names(job_record: dict) -> str:
 def _to_expression_attribute_values(job_record: dict) -> dict:
     expression_attribute_values = {}
     for key, value in job_record.items():
-        if key in ["status", "end_time", "provider_name", "status", "description"]:
+        if key in [
+            "status",
+            "end_time",
+            "provider_name",
+            "status",
+            "provider_job_id",
+            "description",
+            "queue_message_id",
+        ]:
             expression_attribute_values[":" + key] = value
         else:
             expression_attribute_values[":" + key] = Decimal(value)
@@ -127,10 +135,19 @@ def update(table_name: str, key: dict, item: dict) -> None:
     """
     table = _get_resource(table_name)
 
-    table.update_item(
-        Key=key,
-        UpdateExpression=_to_update_expression(item),
-        ExpressionAttributeNames=_to_expression_attribute_names(item),
-        ExpressionAttributeValues=_to_expression_attribute_values(item),
-        ReturnValues="UPDATED_NEW",
-    )
+    attribute_names = _to_expression_attribute_names(item)
+    if len(attribute_names) == 0:
+        table.update_item(
+            Key=key,
+            UpdateExpression=_to_update_expression(item),
+            ExpressionAttributeValues=_to_expression_attribute_values(item),
+            ReturnValues="UPDATED_NEW",
+        )
+    else:
+        table.update_item(
+            Key=key,
+            UpdateExpression=_to_update_expression(item),
+            ExpressionAttributeNames=_to_expression_attribute_names(item),
+            ExpressionAttributeValues=_to_expression_attribute_values(item),
+            ReturnValues="UPDATED_NEW",
+        )

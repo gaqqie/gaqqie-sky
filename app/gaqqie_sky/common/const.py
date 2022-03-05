@@ -1,0 +1,3 @@
+EXECUTION_TYPE_PULL = "pull"
+EXECUTION_TYPE_PUSH_POLL = "push_poll"
+EXECUTION_TYPE_PUSH_NOTIFY = "push_notify"

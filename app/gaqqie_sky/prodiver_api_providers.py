@@ -20,6 +20,7 @@ def register_provider(event: dict, context: "LambdaContext") -> dict:
     dict
         dict corresponding to http response.
     """
+    # insert summary data on db
     provider_record = {
         "name": "gaqqie",
         "status": "ACTIVE",
@@ -27,10 +28,50 @@ def register_provider(event: dict, context: "LambdaContext") -> dict:
     }
     db.insert(resolver.table_provider(), provider_record)
 
+    provider_record = {
+        "name": "IBM",
+        "status": "ACTIVE",
+        "description": "IBM Quantum Services",
+    }
+    db.insert(resolver.table_provider(), provider_record)
+
+    provider_record = {
+        "name": "AWS_Rigetti",
+        "status": "ACTIVE",
+        "description": "Rigetti quantum processors",
+    }
+    db.insert(resolver.table_provider(), provider_record)
+
     # update details on storage
     storage.put(
         resolver.storage_bucket_provider(),
         resolver.storage_key_provider("gaqqie"),
+        "{}",
+    )
+    detail_ibm = {
+        "name": "IBM",
+        "detail": "IBM quantum processors are universal, gate-model machines based on superconducting qubits.",
+        "common_properties": [
+            {
+                "name": "Status",
+                "value": "ACTIVE",
+            },
+        ],
+        "specific_properties": [
+            {
+                "name": "Requirements",
+                "value": "need IBM Q accunt",
+            },
+        ],
+    }
+    storage.put(
+        resolver.storage_bucket_provider(),
+        resolver.storage_key_provider("IBM"),
+        json.dumps(detail_ibm),
+    )
+    storage.put(
+        resolver.storage_bucket_provider(),
+        resolver.storage_key_provider("AWS_Rigetti"),
         "{}",
     )
 

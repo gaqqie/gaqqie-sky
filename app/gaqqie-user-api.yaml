@@ -58,6 +58,15 @@ paths:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetJobsLambdaFunction.Arn}/invocations
         passthroughBehavior: when_no_match
         httpMethod: POST
+      x-amazon-apigateway-cors:
+        allowOrigins: ${self:provider.environment.CORS_ORIGIN}
+        allowHeaders:
+          - Content-Type
+          - X-Amz-Date
+          - Authorization
+          - X-Api-Key
+          - X-Amz-Security-Token
+          - X-Amz-User-Agent
   /v1/jobs/{id}:
     get:
       tags:
@@ -184,6 +193,60 @@ paths:
         type: aws_proxy
         uri:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetDeviceByNameLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+  /v1/devices/provider/{provider_name}:
+    get:
+      tags:
+      - device
+      operationId: get_device_by_provider_name
+      parameters:
+      - name: provider_name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema: 
+                type: array
+                items:
+                  $ref: '#/components/schemas/device'
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetDeviceByProviderNameLambdaFunction.Arn}/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+  /v1/devices/{name}/image:
+    get:
+      tags:
+      - device
+      operationId: get_device_image_by_name
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        404:
+          description: name not found
+          content: {}
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserApiGetDeviceImageByNameLambdaFunction.Arn}/invocations
         passthroughBehavior: when_no_match
         httpMethod: POST
   /v1/providers:

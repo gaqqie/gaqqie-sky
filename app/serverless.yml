@@ -3,9 +3,13 @@ service: ${self:custom.profile}-app
 custom:
   profile: gaqqie-sky
   defaultStage: dev
-  #environment:
-  #  dev: ${file(../conf/dev.yml)}
-  #  prd: ${file(../conf/prd.yml)}
+  environment:
+    dev: ${file(../conf/dev.yml)}
+    prd: ${file(../conf/prd.yml)}
+  webSiteName: ${self:custom.environment.${self:provider.stage}.webSiteName}
+  s3Sync:
+    - bucketName: ${self:custom.webSiteName}
+      localDir: ../web/dist
   lambdaRetry:
     - ErrorEquals:
         - Lambda.ServiceException
@@ -20,21 +24,30 @@ provider:
   runtime: python3.8
   stage: ${opt:stage, self:custom.defaultStage}
   profile: ${self:custom.profile}-${self:provider.stage}
-  region: ap-northeast-1
-  #region: ${self:custom.environment.${self:provider.stage}.region}
+  region: ${self:custom.environment.${self:provider.stage}.region}
   memorySize: 512
   timeout: 30
   logRetentionInDays: 7
   lambdaHashingVersion: 20201221
   #tracing: true
   environment:
+    PROFILE: ${self:custom.profile}
+    SERVICE_NAME: ${self:service}
+    STAGE: ${self:provider.stage}
+    CORS_ORIGIN: "*"
+    # resource name
     TABLE_JOB: ${self:custom.profile}-${self:provider.stage}-job
     TABLE_DEVICE: ${self:custom.profile}-${self:provider.stage}-device
     TABLE_PROVIDER: ${self:custom.profile}-${self:provider.stage}-provider
     QUEUE_PREFIX: ${self:custom.profile}-${self:provider.stage}-
     BUCKET_RESULT: ${self:custom.profile}-${self:provider.stage}-result
     BUCKET_PROVIDER: ${self:custom.profile}-${self:provider.stage}-provider
-    STAGE: ${self:provider.stage}
+    # parameter
+    IBMQ_TOKEN: ${self:custom.environment.${self:provider.stage}.ibm.ibmq_token}
+  #ecr:
+  #  images:
+  #    container-qiskit:
+  #      path: container-qiskit
   iam:
     role:
       statements:
@@ -68,6 +81,10 @@ provider:
             - dynamodb:DeleteItem
           Resource:
             - "Fn::GetAtt": [DynamoDbTableProvider, Arn]
+        - Effect: Allow
+          Action:
+            - lambda:InvokeFunction
+          Resource: "*"
         - Effect: Allow
           Action:
             - sqs:GetQueueAttributes
@@ -105,6 +122,19 @@ package:
 functions:
   UserApiSubmitJob:
     handler: gaqqie_sky.user_api_jobs.submit_job
+  InnnerApiSubmitJobToIbm:
+    image: ${self:custom.environment.${self:provider.stage}.ibm.image.InnnerApiSubmitJobToIbm}
+    command: gaqqie_sky.provider.ibm_provider.submit_job
+    timeout: 60
+  InnnerApiPollJobToIbm:
+    image: ${self:custom.environment.${self:provider.stage}.ibm.image.InnnerApiPollJobToIbm}
+    command: gaqqie_sky.provider.ibm_provider.poll_jobs
+    timeout: 300
+    events:
+      - schedule:
+          rate: cron(0/10 * * * ? *)
+          enabled: ${self:custom.environment.${self:provider.stage}.ibm.schedule.InnnerApiPollJobToIbm}
+          #enabled: ${self:custom.schedule.poll_enabled_ibm}
   UserApiGetJobs:
     handler: gaqqie_sky.user_api_jobs.get_jobs
   UserApiGetJobById:
@@ -117,6 +147,10 @@ functions:
     handler: gaqqie_sky.user_api_devices.get_devices
   UserApiGetDeviceByName:
     handler: gaqqie_sky.user_api_devices.get_device_by_name
+  UserApiGetDeviceByProviderName:
+    handler: gaqqie_sky.user_api_devices.get_device_by_provider_name
+  UserApiGetDeviceImageByName:
+    handler: gaqqie_sky.user_api_devices.get_device_image_by_name
   UserApiGetProviders:
     handler: gaqqie_sky.user_api_providers.get_providers
   UserApiGetProviderByName:
@@ -239,6 +273,37 @@ resources:
               Resource:
                 - arn:aws:s3:::${self:provider.environment.BUCKET_PROVIDER}
                 - arn:aws:s3:::${self:provider.environment.BUCKET_PROVIDER}/*
+    #S3BucketLog:
+    #  Type: AWS::S3::Bucket
+    #  DeletionPolicy: Retain
+    #  Properties:
+    #    BucketName: ${self:custom.profile}-${self:provider.stage}-log
+    #    AccessControl: LogDeliveryWrite
+    S3BucketWebSite:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.webSiteName}
+        AccessControl: PublicRead
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: error.html
+        #LoggingConfiguration:
+        #  DestinationBucketName:
+        #    Ref: S3BucketLog
+        #  LogFilePrefix: ${self:custom.webSiteName}/
+    S3BucketWebSitePolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket:
+          Ref: S3BucketWebSite
+        PolicyDocument:
+          Statement:
+            - Sid: PublicGetObject
+              Effect: Allow
+              Principal: "*"
+              Action:
+               - s3:GetObject
+              Resource: arn:aws:s3:::${self:custom.webSiteName}/*
 
     ### API Gateway(user API)
     ApiGatewayRestApiUser:
@@ -377,3 +442,6 @@ resources:
             - Arn
         Action: "lambda:InvokeFunction"
         Principal: "apigateway.amazonaws.com"
+
+plugins:
+  - serverless-s3-sync
